@@ -1,8 +1,9 @@
-
+einops
 yfinance
 pandas
 numpy
 torch
 transformers
+accelerate
 huggingface_hub
 requests
