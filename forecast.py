@@ -8,9 +8,10 @@ import os
 from datetime import datetime, timedelta
 
 # --- INSTALL KRONOS (GitHub Actions will run this) ---
-os.system("pip install -q transformers accelerate huggingface_hub pandas numpy yfinance")
+# FIXED: Added 'torch' to the install list!
+os.system("pip install -q torch transformers accelerate huggingface_hub pandas numpy yfinance")
 os.system("git clone -q https://github.com/shiyu-coder/Kronos.git")
-sys.path.append("/content/Kronos")  # Fallback for local, but we'll use relative path
+sys.path.append("/content/Kronos")  # Colab fallback (ignored on GitHub)
 sys.path.append("./Kronos")
 
 from model import Kronos, KronosTokenizer, KronosPredictor
