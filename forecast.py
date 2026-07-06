@@ -85,15 +85,15 @@ def run_forecast():
         y_timestamp = pd.Series(future_times)
 
         print("🔮 Running prediction...")
-        pred_df = predictor.predict(
-            df=x_df,
-            x_timestamp=x_timestamp,
-            y_timestamp=y_timestamp,
-            pred_len=pred_len,
-            T=1.0,
-            top_p=0.9,
-            sample_count=1
-        )
+    pred_df = predictor.predict(
+    df=x_df,
+    x_timestamp=x_timestamp,
+    y_timestamp=y_timestamp,
+    pred_len=pred_len,
+    T=0.6,        # Lowered from 1.0 (Reduces randomness/volatility)
+    top_p=0.7,    # Lowered from 0.9 (Cuts off extreme tail predictions)
+    sample_count=1
+)
 
         # --- Format the Results for Telegram ---
         latest = pred_df.iloc[-1]
