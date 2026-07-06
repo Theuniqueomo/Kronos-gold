@@ -8,9 +8,8 @@ import os
 from datetime import datetime, timedelta
 
 # --- INSTALL KRONOS (GitHub Actions will run this) ---
-# FIXED: Added 'torch' to the install list!
 os.system("git clone -q https://github.com/shiyu-coder/Kronos.git")
-sys.path.append("/content/Kronos")  # Colab fallback (ignored on GitHub)
+sys.path.append("/content/Kronos")
 sys.path.append("./Kronos")
 
 from model import Kronos, KronosTokenizer, KronosPredictor
@@ -85,15 +84,17 @@ def run_forecast():
         y_timestamp = pd.Series(future_times)
 
         print("🔮 Running prediction...")
-    pred_df = predictor.predict(
-    df=x_df,
-    x_timestamp=x_timestamp,
-    y_timestamp=y_timestamp,
-    pred_len=pred_len,
-    T=0.6,        # Lowered from 1.0 (Reduces randomness/volatility)
-    top_p=0.7,    # Lowered from 0.9 (Cuts off extreme tail predictions)
-    sample_count=1
-)
+        
+        # --- UPDATED CONSERVATIVE PARAMETERS (FIXED) ---
+        pred_df = predictor.predict(
+            df=x_df,
+            x_timestamp=x_timestamp,
+            y_timestamp=y_timestamp,
+            pred_len=pred_len,
+            T=0.6,        # Lowered from 1.0 (less volatile)
+            top_p=0.7,    # Lowered from 0.9 (cuts extreme outliers)
+            sample_count=1
+        )
 
         # --- Format the Results for Telegram ---
         latest = pred_df.iloc[-1]
