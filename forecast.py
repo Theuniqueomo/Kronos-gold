@@ -7,19 +7,18 @@ import sys
 import os
 from datetime import datetime, timedelta
 
-# --- INSTALL KRONOS (GitHub Actions will run this) ---
+# --- INSTALL KRONOS ---
 os.system("git clone -q https://github.com/shiyu-coder/Kronos.git")
 sys.path.append("/content/Kronos")
 sys.path.append("./Kronos")
 
 from model import Kronos, KronosTokenizer, KronosPredictor
 
-# --- TELEGRAM SETTINGS (Pulled from GitHub Secrets) ---
+# --- TELEGRAM SETTINGS ---
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 def send_telegram(message):
-    """Send a message to your iPad via Telegram"""
     if not BOT_TOKEN or not CHAT_ID:
         print("Missing Telegram credentials. Printing to log instead.")
         print(message)
@@ -34,13 +33,14 @@ def send_telegram(message):
 
 def run_forecast():
     try:
-        print("📥 Downloading Gold data...")
-        df = yf.download("GC=F", period="5d", interval="5m", progress=False)
+        print("📥 Downloading Gold data (15-min candles)...")
+        # --- CHANGED: period="1mo", interval="15m" ---
+        df = yf.download("GC=F", period="1mo", interval="15m", progress=False)
         if df.empty:
             send_telegram("❌ Error: No data downloaded from Yahoo.")
             return
 
-        # --- Data Cleaning (Handles MultiIndex) ---
+        # --- Data Cleaning ---
         df = df.reset_index()
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -60,7 +60,7 @@ def run_forecast():
         df = df[['timestamps', 'open', 'high', 'low', 'close', 'volume']].dropna()
         df['amount'] = 0.0
 
-        print(f"✅ Loaded {len(df)} rows.")
+        print(f"✅ Loaded {len(df)} rows of 15-min data.")
 
         # --- Load Kronos Model ---
         print("🧠 Loading Kronos AI...")
@@ -71,43 +71,41 @@ def run_forecast():
         model = Kronos.from_pretrained(MODEL)
         predictor = KronosPredictor(model, tokenizer, device=device, max_context=512)
 
-        # --- Predict the REAL Future ---
+        # --- Predict the Future ---
         lookback = min(400, len(df) - 120)
-        pred_len = 60  # 5 hours
+        # --- CHANGED: pred_len=20 (20 candles * 15min = 5 hours) ---
+        pred_len = 20  # 5 hours total
         
         x_df = df.loc[:lookback-1, ["open", "high", "low", "close", "volume", "amount"]].fillna(0)
         x_timestamp = pd.Series(df.loc[:lookback-1, "timestamps"])
         
-        # Future timestamps starting from the last known point
         last_time = df['timestamps'].iloc[-1]
-        future_times = pd.date_range(start=last_time + timedelta(minutes=5), periods=pred_len, freq='5min')
+        # --- CHANGED: minutes=15, freq='15min' ---
+        future_times = pd.date_range(start=last_time + timedelta(minutes=15), periods=pred_len, freq='15min')
         y_timestamp = pd.Series(future_times)
 
         print("🔮 Running prediction...")
         
-        # --- UPDATED CONSERVATIVE PARAMETERS (FIXED) ---
         pred_df = predictor.predict(
             df=x_df,
             x_timestamp=x_timestamp,
             y_timestamp=y_timestamp,
             pred_len=pred_len,
-            T=0.6,        # Lowered from 1.0 (less volatile)
-            top_p=0.7,    # Lowered from 0.9 (cuts extreme outliers)
+            T=0.6,
+            top_p=0.7,
             sample_count=1
         )
 
-        # --- Format the Results for Telegram ---
+        # --- Format Results ---
         latest = pred_df.iloc[-1]
         first = pred_df.iloc[0]
         avg_price = pred_df["close"].mean()
         direction = "📈 UP" if latest["close"] > first["close"] else "📉 DOWN"
         change_pct = ((latest["close"] / first["close"]) - 1) * 100
-
-        # Get current Gold price (last historical close)
         current_price = df['close'].iloc[-1]
 
         message = (
-            f"<b>🚀 KRONOS GOLD FORECAST</b>\n"
+            f"<b>🚀 KRONOS GOLD FORECAST (15-min candles)</b>\n"
             f"🕒 Time: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}\n"
             f"─────────────────\n"
             f"💰 Current Gold: <b>${current_price:.2f}</b>\n"
@@ -116,7 +114,7 @@ def run_forecast():
             f"📉 Avg Predicted: ${avg_price:.2f}\n"
             f"🔄 Expected Move: {change_pct:+.2f}%\n"
             f"─────────────────\n"
-            f"<i>First 3 predictions (5min intervals):</i>\n"
+            f"<i>First 3 predictions (15min intervals):</i>\n"
             f"1. {future_times[0].strftime('%H:%M')}: ${pred_df.iloc[0]['close']:.2f}\n"
             f"2. {future_times[1].strftime('%H:%M')}: ${pred_df.iloc[1]['close']:.2f}\n"
             f"3. {future_times[2].strftime('%H:%M')}: ${pred_df.iloc[2]['close']:.2f}\n"
